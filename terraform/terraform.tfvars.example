@@ -1,0 +1,11 @@
+# Copy this file to terraform.tfvars and fill in your real values.
+# NEVER commit terraform.tfvars to version control — it's already in .gitignore.
+
+aws_region            = "us-east-1"
+db_name               = "executiveos"
+db_user               = "admin"
+db_pass               = "ChangeMe_AtLeast8Chars!"
+jwt_secret            = "replace-with-a-random-256bit-secret"
+github_connection_arn = "arn:aws:apprunner:us-east-1:123456789012:connection/your-github/xxxxx"
+github_repo_url       = "https://github.com/your-org/executive-os"
+github_branch         = "main"

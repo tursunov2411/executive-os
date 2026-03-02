@@ -1,0 +1,34 @@
+# Python
+**/__pycache__/
+**/*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+venv/
+.env
+*.env.local
+
+# Node.js / Next.js
+node_modules/
+.next/
+out/
+npm-debug.log*
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/*.tfvars
+terraform/.terraform.lock.hcl
+# Note: terraform.tfvars.example IS committed intentionally
+
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/settings.json
+
+# Logs
+*.log
+governor/sandbox/

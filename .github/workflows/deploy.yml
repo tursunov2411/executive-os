@@ -1,0 +1,108 @@
+name: "Deploy Executive OS — Terraform + Vercel"
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # Allow manual trigger from GitHub UI
+
+jobs:
+  # ─────────────────────────────────────────────
+  # 1. Deploy AWS infrastructure via Terraform
+  # ─────────────────────────────────────────────
+  terraform:
+    name: "Provision AWS (RDS + App Runner)"
+    runs-on: ubuntu-latest
+    outputs:
+      backend_url: ${{ steps.tf_output.outputs.backend_url }}
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init
+        env:
+          AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION:    us-east-1
+
+      - name: Terraform Plan
+        working-directory: ./terraform
+        run: |
+          terraform plan \
+            -var="db_user=${{ secrets.DB_USER }}" \
+            -var="db_pass=${{ secrets.DB_PASS }}" \
+            -var="jwt_secret=${{ secrets.JWT_SECRET }}" \
+            -var="github_connection_arn=${{ secrets.GH_APPRUNNER_ARN }}" \
+            -var="github_repo_url=${{ secrets.GH_REPO_URL }}"
+        env:
+          AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION:    us-east-1
+
+      - name: Terraform Apply
+        working-directory: ./terraform
+        run: |
+          terraform apply -auto-approve \
+            -var="db_user=${{ secrets.DB_USER }}" \
+            -var="db_pass=${{ secrets.DB_PASS }}" \
+            -var="jwt_secret=${{ secrets.JWT_SECRET }}" \
+            -var="github_connection_arn=${{ secrets.GH_APPRUNNER_ARN }}" \
+            -var="github_repo_url=${{ secrets.GH_REPO_URL }}"
+        env:
+          AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION:    us-east-1
+
+      - name: Read Terraform Outputs
+        id: tf_output
+        working-directory: ./terraform
+        run: echo "backend_url=$(terraform output -raw backend_url)" >> $GITHUB_OUTPUT
+        env:
+          AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION:    us-east-1
+
+  # ─────────────────────────────────────────────
+  # 2. Deploy Next.js frontend to Vercel
+  # ─────────────────────────────────────────────
+  vercel:
+    name: "Deploy Next.js to Vercel"
+    needs: terraform
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build Next.js App
+        working-directory: ./frontend
+        run: npm run build
+        env:
+          # Inject the backend URL from previous job into the frontend build
+          NEXT_PUBLIC_BACKEND_URL: ${{ needs.terraform.outputs.backend_url }}
+
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token:      ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id:     ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: ./frontend
+          prod: true

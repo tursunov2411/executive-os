@@ -1,20 +1,63 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { supabase, fetchWithAuth, getApiUrl } from '@/lib/supabase';
 
 export default function ExecutiveDashboard() {
   const [state, setState] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [intentInput, setIntentInput] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
 
   useEffect(() => {
-    fetchState();
+    checkAuth();
   }, []);
+
+  const checkAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      setIsAuthenticated(true);
+      fetchState();
+    } else {
+      setLoading(false);
+    }
+  };
+
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProcessing(true);
+    try {
+      if (authMode === 'signup') {
+        const { error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
+        alert('Check your email for confirmation link!');
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        setIsAuthenticated(true);
+        await fetchState();
+      }
+    } catch (err: any) {
+      alert(err.message || 'Authentication failed');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setIsAuthenticated(false);
+    setState(null);
+  };
 
   const fetchState = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/state');
+      const apiUrl = await getApiUrl();
+      const res = await fetchWithAuth(`${apiUrl}/api/state`);
       const data = await res.json();
       setState(data.state);
     } catch (err) {
@@ -30,9 +73,9 @@ export default function ExecutiveDashboard() {
 
     setProcessing(true);
     try {
-      const res = await fetch('http://localhost:8000/api/cycle', {
+      const apiUrl = await getApiUrl();
+      const res = await fetchWithAuth(`${apiUrl}/api/cycle`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ intent: intentInput }),
       });
       const data = await res.json();
@@ -49,6 +92,52 @@ export default function ExecutiveDashboard() {
     return <div className="min-h-screen bg-black text-white p-8 flex items-center justify-center">INITIALIZING EXECUTIVE OS...</div>;
   }
 
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-black text-white p-8 flex items-center justify-center">
+        <div className="panel max-w-md w-full">
+          <h2 className="text-2xl font-bold mb-6 text-center">EXECUTIVE OS ACCESS</h2>
+          <form onSubmit={handleAuth} className="space-y-4">
+            <div>
+              <label className="block text-xs text-[#888] uppercase mb-2">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-[#111] border border-[#333] px-4 py-2 text-white focus:outline-none focus:border-[#ff4500]"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-[#888] uppercase mb-2">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-[#111] border border-[#333] px-4 py-2 text-white focus:outline-none focus:border-[#ff4500]"
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={processing}
+              className="w-full bg-white text-black py-3 font-semibold hover:bg-gray-200 disabled:opacity-50"
+            >
+              {processing ? 'PROCESSING...' : authMode === 'signin' ? 'SIGN IN' : 'SIGN UP'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}
+              className="w-full text-[#888] text-sm hover:text-white"
+            >
+              {authMode === 'signin' ? 'Need an account? Sign up' : 'Have an account? Sign in'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   // Derived state for the UI
   const currentAction = state?.current_schedule?.[0];
   const compliance = state?.compliance_ema ? (state.compliance_ema * 100).toFixed(1) : "---";
@@ -63,6 +152,12 @@ export default function ExecutiveDashboard() {
           <h1 className="text-sm tracking-widest text-[#888] uppercase mb-1">System Status: Active</h1>
           <h2 className="text-2xl font-semibold tracking-tight">EXECUTIVE OS</h2>
         </div>
+        <button
+          onClick={handleSignOut}
+          className="text-xs text-[#888] hover:text-white uppercase tracking-wider"
+        >
+          Sign Out
+        </button>
         <div className="text-right">
           <p className="text-xs text-[#888] uppercase tracking-wider">Antigravity Runtime Loop</p>
           <div className="flex gap-2 text-xs mt-1 font-mono">

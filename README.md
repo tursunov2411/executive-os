@@ -51,6 +51,43 @@ cd scripts
 python simulate_30_days.py
 ```
 
+## Production deployment (one-command)
+
+Automated deploy for **backend** (Railway), **frontend** (Vercel), and **iOS** `APIService.swift` URL updates:
+
+**Prerequisites:** [Railway CLI](https://docs.railway.app/develop/cli), [Vercel CLI](https://vercel.com/docs/cli), Git.
+
+```bash
+npm install -g railway vercel
+railway login
+vercel login
+```
+
+**macOS / Linux (Git Bash):**
+```bash
+chmod +x deploy_exec_os.sh
+./deploy_exec_os.sh
+```
+
+**Windows (PowerShell):**
+```powershell
+.\deploy_exec_os.ps1
+```
+
+**Options:**
+
+| Flag / Env | Description |
+|------------|-------------|
+| `--skip-backend` / `SKIP_BACKEND=1` | Skip Railway deploy |
+| `--skip-frontend` / `SKIP_FRONTEND=1` | Skip Vercel deploy |
+| `--skip-ios` / `SKIP_IOS=1` | Do not update `APIService.swift` |
+| `--commit` / `COMMIT_CHANGES=1` | Commit and push `.env.local` + iOS URL changes |
+| `BACKEND_URL=https://...` | Override backend URL (e.g. when skipping deploy or using Render/Fly.io) |
+
+To use **Render** or **Fly.io** instead of Railway, set `BACKEND_URL` to your live backend URL and run with `--skip-backend` (deploy backend via their dashboard or CLI separately).
+
+---
+
 ## System Architecture Highlights
 *   **Antigravity Orchestration**: Central closed loop (`OBSERVE -> ANALYZE -> DECIDE -> EXECUTE -> LEARN -> RE-OPTIMIZE`) that manages 6 specialized agents.
 *   **Behavioral Governor**: Applies friction mitigation (e.g. blocking sites, changing environment) rather than increasing notifications based on execution history.
